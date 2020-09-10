@@ -37,7 +37,12 @@ type ThrowsError = Either LispError
 
 data Unpacker = forall a. Eq a => AnyUnpacker (LispVal -> ThrowsError a)
 
-type Env = IORef (M.Map String (IORef LispVal))
+type Evaluator = Env -> LispVal -> IOThrowsError LispVal
+
+data EnvVal = Evaluated LispVal
+            | Thunk Env LispVal
+
+type Env = IORef (M.Map String (IORef EnvVal))
 
 type IOThrowsError = ExceptT LispError IO
 

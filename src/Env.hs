@@ -12,13 +12,29 @@ nullEnv = newIORef M.empty
 isBound :: Env -> String -> IO Bool
 isBound envRef var = liftM (M.member var) (readIORef envRef)
 
-getVar :: Env -> String -> IOThrowsError LispVal
+getVar :: Env -> String -> IOThrowsError EnvVal
 getVar envRef var = do env <- liftIO $ readIORef envRef
                        maybe (throwError $ UnboundVar "Getting an unbound variable" var)
                              (liftIO . readIORef)
                              (M.lookup var env)
 
-setVar :: Env -> String -> LispVal -> IOThrowsError LispVal
+evalVar :: Evaluator -> Env -> String -> IOThrowsError LispVal
+evalVar eval envRef var =
+  do env <- liftIO $ readIORef envRef
+     case (M.lookup var env) of
+      Nothing -> (throwError $ UnboundVar "Getting an unbound variable" var)
+      Just eVIO -> do ev <- liftIO $ readIORef eVIO
+                      case ev of
+                       Evaluated val -> liftIO $ return val
+                       Thunk closure lval -> (eval closure lval)
+
+setEvalVar :: Evaluator -> Env -> String -> IOThrowsError LispVal
+setEvalVar eval envRef var =
+  do evaluated <- evalVar eval envRef var
+     setVar envRef var (Evaluated evaluated)
+     return evaluated
+
+setVar :: Env -> String -> EnvVal -> IOThrowsError EnvVal
 setVar envRef var value = do
                        env <- liftIO $ readIORef envRef
                        maybe (throwError $ UnboundVar "Getting an unbound variable" var)
@@ -26,7 +42,7 @@ setVar envRef var value = do
                              (M.lookup var env)
                        return value
 
-defineVar :: Env -> String -> LispVal -> IOThrowsError LispVal
+defineVar :: Env -> String -> EnvVal -> IOThrowsError EnvVal
 defineVar envRef var value = do
         alreadyDefined <- liftIO $ isBound envRef var
         if alreadyDefined
@@ -37,7 +53,7 @@ defineVar envRef var value = do
                    writeIORef envRef (M.insert var valueRef env)
                    return value
 
-bindVars :: Env -> [(String, LispVal)] -> IO Env
+bindVars :: Env -> [(String, EnvVal)] -> IO Env
 bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
     where extendEnv bindings env = liftM ((`M.union` env) . M.fromList) (mapM addBindings bindings)
           addBindings (var, value) = do ref <- newIORef value

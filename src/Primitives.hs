@@ -8,18 +8,18 @@ import Parser
 import Eval
 
 primitiveBindings :: IO Env
-primitiveBindings = nullEnv >>= (flip bindVars $ map (makeFunc PrimitiveFunc) primitives
-                                             ++ map (makeFunc IOFunc       ) ioPrimitives
-                                             ++ map (makeFunc EnvFunc      ) envPrimitives)
+primitiveBindings = nullEnv >>= (flip bindVars $ map ( (Evaluated <$>) . (makeFunc PrimitiveFunc)) primitives
+                                             ++ map  ( (Evaluated <$>) . (makeFunc IOFunc       )) ioPrimitives
+                                             ++ map  ( (Evaluated <$>) . (makeFunc EnvFunc      )) envPrimitives)
                            where makeFunc constructor (var, func) = (var, constructor func)
 
 envPrimitives :: [(String, Env -> [LispVal] -> IOThrowsError LispVal)]
 envPrimitives = [ ("eval", eval')
                 , ("unquote", eval')
-                , ("apply", applyProc)
+                , ("apply", applyProc valuePolicy)
                 ]
-                  where eval' env [x]    = eval env x
-                        eval' env (x:xs) = eval env x >> eval' env xs
+                  where eval' env [x]    = eval valuePolicy env x
+                        eval' env (x:xs) = eval valuePolicy env x >> eval' env xs
 
 ioPrimitives :: [(String, [LispVal] -> IOThrowsError LispVal)]
 ioPrimitives = [ ("open-input-file"   , makePort ReadMode     )

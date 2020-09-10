@@ -22,8 +22,8 @@ runRepl = primitiveBindings >>= until_ (== "quit") (liftM return $ putStr "Lisp>
 
 runOne :: [String] -> IO ()
 runOne args = do
-        env <- primitiveBindings >>= flip bindVars [("args", List $ map String $ drop 1 args)]
-        runIOThrows (liftM show $ eval env (List [Atom "load", String (head args)])) >>= hPutStrLn stderr
+        env <- primitiveBindings >>= flip bindVars [("args", Evaluated $ List $ map String $ drop 1 args)]
+        runIOThrows (liftM show $ eval valuePolicy env (List [Atom "load", String (head args)])) >>= hPutStrLn stderr
 
 flushStr :: String -> IO ()
 flushStr str = putStr str >> hFlush stdout
@@ -32,7 +32,7 @@ readPrompt :: String -> IO String
 readPrompt prompt = flushStr prompt >> getLine
 
 evalString :: Env -> String -> IO String
-evalString env expr = runIOThrows $ liftM show $ liftThrows (readExpr expr) >>= eval env
+evalString env expr = runIOThrows $ liftM show $ liftThrows (readExpr expr) >>= eval valuePolicy env
 
 evalAndPrint :: Env -> String -> IO ()
 evalAndPrint env expr = evalString env expr >>= putStrLn
